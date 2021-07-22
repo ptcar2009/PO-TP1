@@ -123,7 +123,7 @@ def base(
 def get_vero(tableaux, n_res, n_var):
     vero = np.zeros((n_res + 1, n_var + n_res + 1))
     vero[:, n_res:] = tableaux
-    vero[1:, :n_res] = np.identity(n_res) 
+    vero[1:, :n_res] = np.identity(n_res)
     return vero
 
 def simplex_(
@@ -132,13 +132,14 @@ def simplex_(
     n_var: int,
     costs: int,
     b: np.ndarray,
-) -> Tuple[str, Union[int, None], Union[np.ndarray, None], np.ndarray]:
+) -> Tuple[str, Union[int, None], Union[np.ndarray, None], np.ndarray, np.ndarray, np.ndarray]:
+
     def t():
         return vero[:, n_res:]
 
     while True:
         if (-t()[0, :-1] <= 0).all():
-            return "otima", t()[0, -1], solucao(t(), n_res, n_var, b),  vero[0, :n_res]
+            return "otima", t()[0, -1], solucao(t(), n_res, n_var, b),  vero[0, :n_res], vero, b
 
         k = (np.arange(costs)[t()[0, :-1] < 0])[0]
         if (t()[1:, k] <= 0).all():
@@ -146,14 +147,14 @@ def simplex_(
             cert[b[b < n_var]] = t()[1:, k]
             cert *= -1
             cert[k] = 1
-            return "ilimitada", None,  solucao(t(), n_res, n_var, b), cert[:n_var]
+            return "ilimitada", None,  solucao(t(), n_res, n_var, b), cert[:n_var], vero, b
 
         line = t()[1:, k]
         indices = np.arange(line.shape[0])[line > 0] + 1
-        index = indices[np.argmin((line/t()[1:, -1])[line > 0])]
+        index = indices[np.argmin((t()[indices, -1]/line[indices - 1]))]
         cur = t()[index][b] != 0
         b[cur] = k
-        
+
         pivot(vero, k + n_res, index)
 
 def simplex(
@@ -173,17 +174,22 @@ def simplex(
     :param b np.ndarray: base atual
     :rtype Tuple[str, Union[int, None], Union[np.ndarray, None], np.ndarray]: Condicao da solucao atual, seu valor, e certificado
     """
-    aux = simplex_aux(tableaux, n_res)
-    aux = get_vero(aux, n_res,  n_res+n_var) 
+    aux = get_vero(tableaux, n_res,  n_var).astype("float")
     aux[aux[:, -1] < 0] *= -1
+    aux = simplex_aux(aux, n_res)
     aux[0] -= aux[1:].sum(axis=0)
-    _, ot, __, cert = simplex_(aux, n_res, n_var +
+    _, ot, __, cert, aux, b = simplex_(aux, n_res, n_var +
                                 n_res, n_var + n_res, np.arange(n_res)  + n_var)
-    if ot is not None and ot < 0:
+    if ot is not None and np.round(ot, 7) < 0:
         return "inviavel", None, None, cert
     vero = get_vero(tableaux, n_res, n_var)
-    vero[vero[:, -1] < 0] *= -1
-    return simplex_(vero, n_res, n_var, costs, base(vero[:, n_res:], n_res, n_var))
+    vero[:, :n_res + n_var] = aux[:, :n_res + n_var]
+    vero[0, n_res:] = tableaux[0] + aux[0, :n_res].T@tableaux[1:]
+    vero[:, -1] = aux[:, -1]
+
+    for i in b:
+        pivot(vero, i + n_res,np.arange(n_res)[vero[1:,  n_res + i] != 0][0] + 1 )
+    return simplex_(vero, n_res, n_var, costs, b)[:-2]
 
 def simplex_aux(tableaux, n_res):
     new_tableaux = np.zeros((tableaux.shape[0], tableaux.shape[1] + n_res))
@@ -216,4 +222,4 @@ def ler_tableaux() -> Tuple[int, int, np.ndarray]:
             restricoes += [cur_line[-1]]
 
     tableaux = build_tableaux(coeficientes, restricoes, custos, n_res, n_var)
-    return n_res, n_res+n_var, tableaux
+    return n_res, n_res+n_var, tableaux.astype("float")
