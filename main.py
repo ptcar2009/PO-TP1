@@ -1,5 +1,6 @@
 """Resolve um simplex da entrada padrao"""
 from simplex import ler_tableaux, simplex, base
+from numpy import round
 
 if __name__ == "__main__":
     n_res, n_var, tableaux = ler_tableaux()
@@ -11,12 +12,12 @@ if __name__ == "__main__":
     else:
         last_cert = n_res
     if ot is not None:
-        print(int(ot))
+        print(f"{round(ot, 7):.7f}".strip("-"))
     if sol is not None:
         for i in sol[:n_var-n_res]:
-            print(int(i), end=' ')
+            print(f"{round(i, 7):.7f}".strip("-"), end=' ')
         print()
     if cert is not None:
         for i in cert[:last_cert]:
-            print(int(i), end=' ')
+            print(f"{round(i, 7):.7f}".strip("-"), end=' ')
         print()
